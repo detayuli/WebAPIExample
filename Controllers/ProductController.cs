@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
-using WebAPIExample;
+using Microsoft.EntityFrameworkCore;
+using WebAPIExample.Data;
+using WebAPIExample.Data.Models;
 
 namespace WebAPIExample.Controllers
 {
@@ -8,53 +9,32 @@ namespace WebAPIExample.Controllers
     [Route("api/[controller]")]
     public class ProductController : ControllerBase
     {
-        // =============================
-        // 🔹 MOCK DATA (sementara)
-        // =============================
-        private static List<Category> categories = new List<Category>
+        private readonly AppDbContext _context;
+
+    public ProductController(AppDbContext context)
         {
-            new Category { Id = 1, Name = "Electronics" },
-            new Category { Id = 2, Name = "Accessories" },
-            new Category { Id = 3, Name = "Home Appliances" }
-        };
-
-        private static List<Product> products = new List<Product>
-        {
-            new Product { Id = 1, Name = "Laptop", Description = "A high-performance laptop", Price = 999.99m, Category = new Category { Id = 1, Name = "Electronics" } },
-            new Product { Id = 2, Name = "Headphones", Description = "Noise-cancelling headphones", Price = 199.99m, Category = new Category { Id = 2, Name = "Accessories" } }
-        };
-
-        // =============================
-        // 🔹 CREATE (POST)
-        // =============================
-        [HttpPost]
-        public ActionResult<Product> CreateProduct([FromBody] Product newProduct)
-        {
-            if (newProduct == null)
-                return BadRequest("Product data is required.");
-
-            // Pastikan ID tidak diperlukan dari client
-            newProduct.Id = new Random().Next(100, 999);
-
-            products.Add(newProduct);
-
-            return CreatedAtAction(nameof(GetProductById), new { id = newProduct.Id }, newProduct);
+            _context = context;
         }
 
-
         // =============================
-        // 🔹 READ (GET ALL)
+        // 🔹 GET ALL PRODUCTS
         // =============================
         [HttpGet]
-        public ActionResult<IEnumerable<Product>> GetAllProducts()
+        public async Task<ActionResult<IEnumerable<Product>>> GetAllProducts()
         {
+            var products = await _context.Products.Include(p => p.Category).ToListAsync();
             return Ok(products);
         }
 
+        // =============================
+        // 🔹 GET PRODUCT BY ID
+        // =============================
         [HttpGet("{id}")]
-        public ActionResult<Product> GetProductById(int id)
+        public async Task<ActionResult<Product>> GetProductById(int id)
         {
-            var product = products.Find(p => p.Id == id);
+            var product = await _context.Products.Include(p => p.Category)
+                                                 .FirstOrDefaultAsync(p => p.Id == id);
+
             if (product == null)
                 return NotFound($"Product with ID {id} not found.");
 
@@ -62,57 +42,78 @@ namespace WebAPIExample.Controllers
         }
 
         // =============================
-        // 🔹 UPDATE (PUT)
+        // 🔹 CREATE PRODUCT
+        // =============================
+        [HttpPost]
+        public async Task<ActionResult<Product>> CreateProduct(Product newProduct)
+        {
+            if (newProduct == null)
+                return BadRequest("Product data is required.");
+
+            _context.Products.Add(newProduct);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetProductById), new { id = newProduct.Id }, newProduct);
+        }
+
+        // =============================
+        // 🔹 UPDATE PRODUCT
         // =============================
         [HttpPut("{id}")]
-        public IActionResult UpdateProduct(int id, [FromBody] Product updatedProduct)
+        public async Task<IActionResult> UpdateProduct(int id, Product updatedProduct)
         {
             if (id != updatedProduct.Id)
                 return BadRequest("Product ID mismatch.");
 
-            var existingProduct = products.Find(p => p.Id == id);
-            if (existingProduct == null)
-                return NotFound($"Product with ID {id} not found.");
+            _context.Entry(updatedProduct).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
 
-            existingProduct.Name = updatedProduct.Name;
-            existingProduct.Description = updatedProduct.Description;
-            existingProduct.Price = updatedProduct.Price;
-            existingProduct.Category = updatedProduct.Category;
-            // Logic to update the product (e.g., database call)
-            return NoContent(); // Indicates the update was successful but no content is returned
+            return NoContent();
         }
 
         // =============================
-        // 🔹 DELETE
+        // 🔹 DELETE PRODUCT
         // =============================
         [HttpDelete("{id}")]
-        public IActionResult DeleteProduct(int id)
+        public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = products.Find(p => p.Id == id);
+            var product = await _context.Products.FindAsync(id);
             if (product == null)
                 return NotFound($"Product with ID {id} not found.");
 
-            products.Remove(product);
-            return NoContent(); 
+            _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
+
+            // 🔹 Cek apakah masih ada data
+            var maxId = await _context.Products.AnyAsync()
+                ? await _context.Products.MaxAsync(p => p.Id)
+                : 0;
+
+            // 🔹 Reset identity (agar bisa pakai ID kosong lagi)
+            await _context.Database.ExecuteSqlRawAsync($"DBCC CHECKIDENT ('Products', RESEED, {maxId})");
+
+            return NoContent();
         }
 
         // =============================
         // 🔹 CATEGORY ENDPOINTS
         // =============================
         [HttpGet("category")]
-        public ActionResult<IEnumerable<Category>> GetAllCategories()
+        public async Task<ActionResult<IEnumerable<Category>>> GetAllCategories()
         {
+            var categories = await _context.Categories.ToListAsync();
             return Ok(categories);
         }
 
         [HttpGet("category/{id}")]
-        public ActionResult<Category> GetCategoryById(int id)
+        public async Task<ActionResult<Category>> GetCategoryById(int id)
         {
-            var category = categories.Find(c => c.Id == id);
+            var category = await _context.Categories.FindAsync(id);
             if (category == null)
                 return NotFound($"Category with ID {id} not found.");
 
             return Ok(category);
         }
     }
+
 }

@@ -1,23 +1,21 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using WebAPIExample.Data; // 🔹 Ganti dengan namespace proyek kamu (misalnya: MyWebApi.Data)
+using WebAPIExample.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Tambahkan controller dan EF Core
 builder.Services.AddControllers();
-
-// 🔹 Tambahkan konfigurasi EF Core dengan SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 🔹 Swagger/OpenAPI configuration (untuk dokumentasi dan uji API)
+
+// Tambahkan Swagger untuk dokumentasi API
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Konfigurasi pipeline HTTP
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -25,9 +23,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

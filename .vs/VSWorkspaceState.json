@@ -1,0 +1,13 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\.github",
+    "\\bin",
+    "\\Controllers",
+    "\\Data",
+    "\\obj",
+    "\\Properties"
+  ],
+  "SelectedNode": "\\WebAPIExample.csproj",
+  "PreviewInSolutionExplorer": false
+}
